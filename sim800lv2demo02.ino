@@ -113,7 +113,7 @@ void sendInfoToGSM()
   gsm.print("&value=");
   gsm.print(message);
   gsm.println("\"");
-  // "web.hosting-test.net/api/?token=1234567890&source=%2b380956330650&type=0&value=Started:+123456"
+  // "web.hosting-test.net/api/?token=1234567890&source=%2b38095XXXXXXX&type=0&value=Started:+123456"
   waitForResponse();
   gsm.println("AT+HTTPSSL=0");
   waitForResponse();
