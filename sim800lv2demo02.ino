@@ -47,8 +47,6 @@ void setup()
   //pinMode(moisture_sensor_power, OUTPUT);
   //pinMode(raine_sensor_power, OUTPUT);
 
-  started = millis();
-
   pinMode(5, OUTPUT);
   digitalWrite(5, LOW);
   Serial.println("GSM RST LOW (shutdown)");
@@ -155,8 +153,8 @@ void sendInfoToGSM()
   gsm.print(F("&source="));
   gsm.print(mynumber);
   gsm.print(F("&message="));
-  gsm.print(F("1:")); gsm.print(36.6);
-  /*gsm.print(ds.getTempC(sensor1));
+  gsm.print(F("1:"));
+  gsm.print(36.6);  /*gsm.print(ds.getTempC(sensor1));
   gsm.print(";2:");
   gsm.print(ds.getTempC(sensor2));
   gsm.print(";3:");
