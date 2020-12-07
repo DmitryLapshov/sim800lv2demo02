@@ -23,7 +23,7 @@ SoftwareSerial gsm(2, 3); //SIM800L Tx & Rx is connected to Arduino #2 & #3
 //int very_moist_value = 78;
 
 const String token = "1234567890";
-const String url = "http://XXXXXXXX.XXXXXXXX.web.hosting-test.net/api/";
+const String url = "http://18XXXXXXX.egXXXXXX.web.hosting-test.net/api/";
 const unsigned long period = 60000; // Every minute
 const unsigned long timeout = 10000;
 
@@ -98,7 +98,7 @@ void sendInfoToGSM()
   /*ds.requestTemperatures();
   
   float h = dht.readHumidity();
-  // РЎС‡РёС‚С‹РІР°РЅРёРµ С‚РµРјРїРµСЂР°С‚СѓСЂС‹ РІ С†РµР»СЊСЃРёСЏС…
+  // ‘читывание температуры в цельсиЯх
   float t = dht.readTemperature();
   
   digitalWrite(moisture_sensor_power, HIGH);
