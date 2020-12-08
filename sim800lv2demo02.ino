@@ -1,38 +1,18 @@
-//#include <DHT.h>
-//#include <OneWire.h>
-//#include <DallasTemperature.h>
 #include <SoftwareSerial.h>
 
-SoftwareSerial gsm(2, 3); //SIM800L Tx & Rx is connected to Arduino #2 & #3
+#define period 120000
+#define timeout 10000
+#define attempts 3
 
-//OneWire oneWire(10);
-//DallasTemperature ds(&oneWire);
+static SoftwareSerial gsm(2, 3); //SIM800L Tx & Rx is connected to Arduino #2 & #3
 
-//#define DHTPIN 4
-//#define DHTTYPE DHT11
-
-#define amoisture_sensor A0
-#define bmoisture_sensor A1
-#define cmoisture_sensor A2
-#define raine_sensor A3
-#define moisture_sensor_power 8
-#define raine_sensor_power 7
-
-//DHT dht(DHTPIN, DHTTYPE);
-
-//int very_moist_value = 78;
-
+const String url = "http://18XXXXXX.egXXXXXXX.web.hosting-test.net/api/";
 const String token = "1234567890";
-const String url = "http://18XXXXXXX.egXXXXXX.web.hosting-test.net/api/";
-const unsigned long period = 60000; // Every minute
-const unsigned long timeout = 10000;
 
-unsigned long started;
-String buff;
-String mynumber;
-
-//DeviceAddress sensor1 = {0x28, 0xB6, 0x5F, 0x17, 0xC, 0x0, 0x0, 0x54};
-//DeviceAddress sensor2 = {0x28, 0xB4, 0x4, 0x17, 0xC, 0x0, 0x0, 0xDF};
+static unsigned long started;
+static String buff;
+static String mynumber;
+static bool success;
 
 void setup()
 {
@@ -41,17 +21,11 @@ void setup()
   Serial.begin(9600);
   gsm.begin(9600);
 
-  //ds.begin();
-  //dht.begin();
-
-  //pinMode(moisture_sensor_power, OUTPUT);
-  //pinMode(raine_sensor_power, OUTPUT);
-
   pinMode(5, OUTPUT);
   digitalWrite(5, LOW);
   Serial.println("GSM RST LOW (shutdown)");
 
-  sendInfoToGSM();
+  attempt();
 }
 
 void loop()
@@ -62,7 +36,17 @@ void loop()
   if (millis() - started > period) {
     Serial.println("Ellapsed");
     started = millis();
+    
+    attempt();
+  }
+}
+
+void attempt() {
+  for(int i = 1; i <= attempts; i++) {
+    Serial.print(F("Attempt #"));
+    Serial.println(i);
     sendInfoToGSM();
+    if (success) break;
   }
 }
 
@@ -92,28 +76,8 @@ bool wait()
 
 void sendInfoToGSM()
 {
- 
-  /*ds.requestTemperatures();
+  success = false;
   
-  float h = dht.readHumidity();
-  // Считывание температуры в цельсиях
-  float t = dht.readTemperature();
-  
-  digitalWrite(moisture_sensor_power, HIGH);
-  digitalWrite(raine_sensor_power, HIGH);
-  delay (10);
-  int amoisture_value = analogRead(amoisture_sensor);
-  int bmoisture_value = analogRead(bmoisture_sensor);
-  int cmoisture_value = analogRead(cmoisture_sensor);
-  int raine_value = analogRead(raine_sensor);
-  
-  digitalWrite(raine_sensor_power, LOW);
-  digitalWrite(moisture_sensor_power, LOW);
-  int amoisture_value_percent = map(amoisture_value,very_moist_value,1023,100,0);
-  int bmoisture_value_percent = map(bmoisture_value,very_moist_value,1023,100,0);
-  int cmoisture_value_percent = map(cmoisture_value,very_moist_value,1023,100,0);
-  int raine_value_percent = map(raine_value,very_moist_value,1023,100,0);
-  */
   pinMode(5, INPUT_PULLUP);
   Serial.println("GSM RST PULLUP (wake up)");
   delay(15000);
@@ -153,22 +117,10 @@ void sendInfoToGSM()
   gsm.print(F("&source="));
   gsm.print(mynumber);
   gsm.print(F("&message="));
-  gsm.print(F("1:"));
-  gsm.print(36.6);  /*gsm.print(ds.getTempC(sensor1));
+  gsm.print(F("1:")); 
+  gsm.print(random(350, 370)*.1);
   gsm.print(";2:");
-  gsm.print(ds.getTempC(sensor2));
-  gsm.print(";3:");
-  gsm.print(h);
-  gsm.print(";4:");
-  gsm.print(t);
-  gsm.print(";5:");
-  gsm.print(amoisture_value_percent);
-  gsm.print(";6:");
-  gsm.print(bmoisture_value_percent);
-  gsm.print(";7:");
-  gsm.print(cmoisture_value_percent);
-  gsm.print(";8:");
-  gsm.print(raine_value_percent);*/
+  gsm.print(random(350, 370)*.1);
   gsm.println("\"");
   
   waitForResponse();
@@ -183,6 +135,7 @@ void sendInfoToGSM()
     waitForResponse();
     gsm.println(F("AT+HTTPREAD"));
     waitForResponse();
+    success = true;
   }
   
   gsm.println(F("AT+HTTPTERM"));
