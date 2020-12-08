@@ -34,9 +34,7 @@ void loop()
   while(gsm.available()) Serial.write(gsm.read());
 
   if (millis() - started > period) {
-    Serial.println("Ellapsed");
     started = millis();
-    
     attempt();
   }
 }
@@ -119,7 +117,7 @@ void sendInfoToGSM()
   gsm.print(F("&message="));
   gsm.print(F("1:")); 
   gsm.print(random(350, 370)*.1);
-  gsm.print(";2:");
+  gsm.print(F(";2:"));
   gsm.print(random(350, 370)*.1);
   gsm.println("\"");
   
