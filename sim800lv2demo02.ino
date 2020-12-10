@@ -1,41 +1,45 @@
+#include <LowPower.h>
 #include <SoftwareSerial.h>
+#include <DHT.h>
 
-#define period 120000
-#define timeout 10000
+#define periodMinutes 20
+#define timeout 30000
 #define attempts 3
 
-static SoftwareSerial gsm(2, 3); //SIM800L Tx & Rx is connected to Arduino #2 & #3
+SoftwareSerial gsm(2, 3); //SIM800L Tx & Rx is connected to Arduino #2 & #3
+DHT dht(4, DHT22); // Initialize DHT sensor for normal 16mhz Arduino
 
-const String url = "http://18XXXXXX.egXXXXXXX.web.hosting-test.net/api/";
+const String apn = "internet";
+const String url = "http://18XXXXX.eg3XXXXX.web.hosting-test.net/api/";
 const String token = "1234567890";
 
-static unsigned long started;
-static String buff;
-static String mynumber;
-static bool success;
+byte mins, remains;
+String buff, mynumber, serverTime;
+bool success;
+unsigned int sleepCounter;
+
+float hum;  //Stores humidity value
+float temp; //Stores temperature value
 
 void setup()
 {
-  started = millis();
-  Serial.println("Starting serials..."); 
   Serial.begin(9600);
   gsm.begin(9600);
-
-  pinMode(5, OUTPUT);
-  digitalWrite(5, LOW);
-  Serial.println("GSM RST LOW (shutdown)");
-
-  attempt();
+  dht.begin();
 }
 
 void loop()
 {
-  while (Serial.available()) gsm.write(Serial.read());
-  while(gsm.available()) Serial.write(gsm.read());
+  attempt();
 
-  if (millis() - started > period) {
-    started = millis();
-    attempt();
+  Serial.print(F("Sleeping for "));
+  Serial.print(remains);
+  Serial.println(F(" minute(s)"));
+  Serial.flush();
+
+  sleepCounter = remains * 60 / 4;
+  for (unsigned int i = 0; i < sleepCounter; i++) {
+    LowPower.powerDown(SLEEP_4S, ADC_OFF, BOD_OFF);
   }
 }
 
@@ -44,7 +48,11 @@ void attempt() {
     Serial.print(F("Attempt #"));
     Serial.println(i);
     sendInfoToGSM();
-    if (success) break;
+    if (success) {
+      Serial.println(F("SUCCESS"));
+      break;
+    }
+    delay(60000);
   }
 }
 
@@ -74,32 +82,46 @@ bool wait()
 
 void sendInfoToGSM()
 {
+  int idx;
   success = false;
-  
-  pinMode(5, INPUT_PULLUP);
-  Serial.println("GSM RST PULLUP (wake up)");
-  delay(15000);
+
+  Serial.println(F("Reading sensors..."));
+  hum = dht.readHumidity();
+  temp = dht.readTemperature();
+
+  Serial.println("Resetting modem..."); 
+  pinMode(5, OUTPUT);
+  digitalWrite(5, LOW);
+  delay(500);
+  pinMode(5, INPUT);
+  delay(20000);
  
   gsm.println(F("AT"));
   waitForResponse();
-  
-  if (buff.indexOf("OK") == -1) return; // If not connected to GSM modem
+  if (buff.indexOf("OK") == -1) {
+    Serial.println(F("Not connected to GSM modem"));
+    return;
+  }
 
   gsm.println(F("AT+CNUM"));
   waitForResponse();
   
   mynumber = "%2b";
-  int idx = buff.indexOf("+CNUM:");
+  idx = buff.indexOf("+CNUM:");
   mynumber.concat(buff.substring(idx + 12, idx + 24));
   
   gsm.println(F("AT+CREG?"));
   waitForResponse();
-
-  if (buff.indexOf("+CREG: 0,1") == -1) return; // if not connected to the network
+  if (buff.indexOf("+CREG: 0,1") == -1) {
+    Serial.println(F("Not connected to the network"));
+    return;
+  }
  
   gsm.println(F("AT+SAPBR=3,1,\"Contype\",\"GPRS\""));
   waitForResponse();
-  gsm.println(F("AT+SAPBR=3,1,\"APN\",\"internet\""));
+  gsm.print(F("AT+SAPBR=3,1,\"APN\",\""));
+  gsm.print(apn);
+  gsm.println(F("\""));
   waitForResponse();
   gsm.println(F("AT+SAPBR=1,1"));
   waitForResponse();
@@ -107,7 +129,6 @@ void sendInfoToGSM()
   waitForResponse();
   gsm.println(F("AT+HTTPPARA=\"CID\",1"));
   waitForResponse();
-
   gsm.print(F("AT+HTTPPARA=\"URL\",\""));
   gsm.print(url);
   gsm.print(F("?token="));
@@ -116,9 +137,9 @@ void sendInfoToGSM()
   gsm.print(mynumber);
   gsm.print(F("&message="));
   gsm.print(F("1:")); 
-  gsm.print(random(350, 370)*.1);
+  gsm.print(hum);
   gsm.print(F(";2:"));
-  gsm.print(random(350, 370)*.1);
+  gsm.print(temp);
   gsm.println("\"");
   
   waitForResponse();
@@ -131,9 +152,17 @@ void sendInfoToGSM()
   
   if (buff.indexOf("ERROR") == -1) {
     waitForResponse();
-    gsm.println(F("AT+HTTPREAD"));
-    waitForResponse();
-    success = true;
+    if (buff.indexOf("200") != -1) {
+      gsm.println(F("AT+HTTPREAD"));
+      waitForResponse();
+      idx = buff.indexOf("NOW:");
+      if (idx != -1) {
+        serverTime = buff.substring(idx + 4, idx + 23);
+        mins = serverTime.substring(14, 16).toInt();
+        remains = periodMinutes - mins % periodMinutes;
+      } 
+      success = true;
+    }
   }
   
   gsm.println(F("AT+HTTPTERM"));
@@ -141,7 +170,11 @@ void sendInfoToGSM()
   gsm.println(F("AT+SAPBR=0,1"));
   waitForResponse();
 
-  pinMode(5, OUTPUT);
-  digitalWrite(5, LOW);
-  Serial.println("GSM RST LOW (shutdown)");
+  gsm.println(F("AT+CFUN=0"));
+  waitForResponse();
+  waitForResponse();
+  
+  gsm.println(F("AT+CSCLK=2"));
+  waitForResponse();
+  delay(6000);
 }
