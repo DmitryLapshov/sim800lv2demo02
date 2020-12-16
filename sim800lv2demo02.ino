@@ -140,7 +140,7 @@ boolean sendInfoToGSM(String *message)
   gsm.println(F("AT+HTTPACTION=0"));
   waitForResponse(buff);
   
-  if (strstr(buff, "ERROR") != NULL) {
+  if (strstr(buff, "ERROR") == NULL) {
     waitForResponse(buff);
     if (strstr(buff, "200") != NULL) {
       gsm.println(F("AT+HTTPREAD"));
