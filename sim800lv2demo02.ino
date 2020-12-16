@@ -34,11 +34,12 @@ void loop()
 }
 
 void attempt() {
-  String message = "1:";
   Serial.println(F("Reading sensors..."));
   hum = dht.readHumidity();
   temp = dht.readTemperature();
 
+  Serial.println(F("Creating message..."));
+  String message = "1:";
   message.concat(hum);
   message.concat(";2:");
   message.concat(temp);
@@ -47,7 +48,7 @@ void attempt() {
     Serial.print(F("Attempt #"));
     Serial.println(i);
   
-    if (sendInfoToGSM(&message)) {
+    if (sendInfoToGSM(message.c_str())) {
       Serial.println(F("SUCCESS"));
       break;
     }
@@ -79,7 +80,7 @@ void waitForResponse(char *buff) {
   }
 }
 
-boolean sendInfoToGSM(String *message)
+boolean sendInfoToGSM(char *message)
 {
   int idx;
   boolean success = false;
@@ -130,7 +131,7 @@ boolean sendInfoToGSM(String *message)
   gsm.print(F("AT+HTTPPARA=\"URL\",\"http://18XXXXX.eg3XXXXX.web.hosting-test.net/api/?token=1234567890&source="));
   gsm.print(mynum);
   gsm.print(F("&message="));
-  gsm.print(*message); 
+  gsm.print(message); 
   gsm.println("\"");
   waitForResponse(buff);
   
