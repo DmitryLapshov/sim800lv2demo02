@@ -75,7 +75,7 @@ void waitForResponse(char *buff) {
   
   if (gsm.available()) {
     strcpy(buff, gsm.readString().c_str());
-    Serial.print(*buff);
+    Serial.print(buff);
   }
 }
 
