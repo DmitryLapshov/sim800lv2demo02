@@ -3,15 +3,15 @@
 #include <DHT.h>
 
 #define periodMinutes 20
-#define timeout 30000
+#define timeout 20000
 #define attempts 3
+
+#define APN "internet"
+#define URL "http://18XXXXX.eg3XXXXX.web.hosting-test.net/api/"
+#define TOKEN "1234567890"
 
 SoftwareSerial gsm(2, 3); //SIM800L Tx & Rx is connected to Arduino #2 & #3
 DHT dht(4, DHT22); // Initialize DHT sensor for normal 16mhz Arduino
-
-const char apn[] = "internet";
-const char url[] = "http://18XXXXX.eg3XXXXX.web.hosting-test.net/api/";
-const char token[] = "1234567890";
 
 uint16_t remains;
 
@@ -32,13 +32,13 @@ void loop()
 }
 
 void lowPower(uint16_t minutes) {
-  uint16_t sleepCounter = minutes * 15;
+  uint16_t sleepCounter = minutes * 60 / 8; // It's not very accurate but acceptable
   Serial.print(F("Sleeping for "));
   Serial.print(minutes);
   Serial.println(F(" minute(s)"));
   Serial.flush();
   for (uint16_t i = 0; i < sleepCounter; i++) {
-    LowPower.powerDown(SLEEP_4S, ADC_OFF, BOD_OFF);
+    LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
   }
 }
 
@@ -46,11 +46,16 @@ void attempt() {
   Serial.println(F("Reading sensors..."));
   hum = dht.readHumidity();
   temp = dht.readTemperature();
+
+  String message = F("1:");
+  message.concat(hum);
+  message.concat(F(";2:"));
+  message.concat(temp);
   
   for(int i = 1; i <= attempts; i++) {
     Serial.print(F("Attempt #"));
     Serial.println(i);
-    if (sendInfoToGSM()) {
+    if (sendInfoToGSM(&message)) {
       Serial.println(F("SUCCESS"));
       break;
     }
@@ -63,7 +68,7 @@ void waitForResponse(String *buff) {
   
   while(!gsm.available()) {
     if (millis() - started > timeout) {
-      Serial.println("Timed out!");
+      Serial.println(F("Timed out!"));
       break;
     }
   }
@@ -83,26 +88,25 @@ void listenResponses() {
   while (millis() - started < timeout) {
     while (gsm.available()) {
       Serial.write(gsm.read());
-      Serial.flush();
     }
   }
 }
 
-boolean sendInfoToGSM()
+boolean sendInfoToGSM(String *message)
 {
   boolean success = false;
   String buff;
 
-  Serial.println("Waking up modem..."); 
+  Serial.println(F("Waking up modem...")); 
   pinMode(5, OUTPUT);
   digitalWrite(5, LOW);
-  delay(1000);
+  delay(500);
   pinMode(5, INPUT);
   listenResponses();
  
   gsm.println(F("AT"));
   waitForResponse(&buff);
-  if (buff.indexOf("OK") == -1) {
+  if (buff.indexOf(F("OK")) == -1) {
     Serial.println(F("Not connected to GSM modem"));
   }
 
@@ -110,19 +114,19 @@ boolean sendInfoToGSM()
   waitForResponse(&buff);
   
   String mynumber = "%2b";
-  int idx = buff.indexOf("+CNUM:");
+  int idx = buff.indexOf(F("+CNUM:"));
   mynumber.concat(buff.substring(idx + 12, idx + 24));
   
   gsm.println(F("AT+CREG?"));
   waitForResponse(&buff);
-  if (buff.indexOf("+CREG: 0,1") == -1) {
+  if (buff.indexOf(F("+CREG: 0,1")) == -1) {
     Serial.println(F("Not connected to the network"));
   }
  
   gsm.println(F("AT+SAPBR=3,1,\"Contype\",\"GPRS\""));
   waitForResponse(&buff);
   gsm.print(F("AT+SAPBR=3,1,\"APN\",\""));
-  gsm.print(apn);
+  gsm.print(F(APN));
   gsm.println(F("\""));
   waitForResponse(&buff);
   gsm.println(F("AT+SAPBR=1,1"));
@@ -135,32 +139,29 @@ boolean sendInfoToGSM()
   gsm.println(F("AT+HTTPPARA=\"CID\",1"));
   waitForResponse(&buff);
   gsm.print(F("AT+HTTPPARA=\"URL\",\""));
-  gsm.print(url);
+  gsm.print(F(URL));
   gsm.print(F("?token="));
-  gsm.print(token);
+  gsm.print(F(TOKEN));
   gsm.print(F("&source="));
   gsm.print(mynumber);
   gsm.print(F("&message="));
-  gsm.print(F("1:")); 
-  gsm.print(hum);
-  gsm.print(F(";2:"));
-  gsm.print(temp);
+  gsm.print(*message); ;
   gsm.println("\"");
   
   waitForResponse(&buff);
   gsm.print(F("AT+HTTPSSL="));
-  gsm.println(strstr(url, "https") != 0 ? 1 : 0);
+  gsm.println(strstr(URL, "https") != 0 ? 1 : 0);
   waitForResponse(&buff);
   
   gsm.println(F("AT+HTTPACTION=0"));
   waitForResponse(&buff);
   
-  if (buff.indexOf("ERROR") == -1) {
+  if (buff.indexOf(F("ERROR")) == -1) {
     waitForResponse(&buff);
-    if (buff.indexOf("200") != -1) {
+    if (buff.indexOf(F("200")) != -1) {
       gsm.println(F("AT+HTTPREAD"));
       waitForResponse(&buff);
-      idx = buff.indexOf("NOW:");
+      idx = buff.indexOf(F("NOW:"));
       if (idx != -1) {
         remains = periodMinutes - buff.substring(idx + 18, idx + 20).toInt() % periodMinutes;
       } 
